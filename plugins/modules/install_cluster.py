@@ -139,6 +139,14 @@ def run_module():
         if response.json()['status'] == "installed":
             cluster_installed = True
             result['result'] = response.json()
+        elif response.json()['status'] == "ready":
+            # Retry start installation if the cluster was moved to ready again
+            response = session.post(
+                "https://api.openshift.com/api/assisted-install/v2/clusters/" + module.params['cluster_id'] + "/actions/install",
+                headers=headers,
+            )
+            if "code" in response.json():
+                module.fail_json(msg='ERROR: ', **response.json())
         else:
             time.sleep(module.params['delay'])
 

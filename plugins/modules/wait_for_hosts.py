@@ -44,6 +44,18 @@ options:
         required: False
         type: int
         default: 10
+    offline_token:
+        description: Offline token from console.redhat.com
+        required: false
+        type: str
+    client_id:
+        description: RH Service Account Client ID
+        required: false
+        type: str
+    client_sercret:
+        description: RH Service Account Client Secret
+        required: false
+        type: str
 
 author:
     - Alberto Gonzalez (@agonzalezrh)
@@ -71,7 +83,9 @@ def run_module():
     module_args = dict(
         cluster_id=dict(type='str', required=True),
         infra_env_id=dict(type='str', required=False),
-        offline_token=dict(type='str', required=True),
+        offline_token=dict(type='str', required=False),
+        client_id=dict(type='str', required=False),
+        client_secret=dict(type='str', required=False),
         expected_hosts=dict(type='int', required=True),
         wait_timeout=dict(type='int', required=False, default=600),
         delay=dict(type='int', required=False, default=10),
@@ -94,7 +108,7 @@ def run_module():
     module = AnsibleModule(
         argument_spec=module_args,
         supports_check_mode=True,
-        required_together=[['configure_hosts', 'infra_env_id']]
+        required_together=[['configure_hosts', 'infra_env_id'], ['client_id', 'client_secret']]
     )
 
     session = requests.Session()
@@ -105,7 +119,12 @@ def run_module():
     cluster_ready = False
     max_retries = module.params['wait_timeout'] / module.params['delay']
     while retries < max_retries and cluster_ready is False:
-        response = access_token._get_access_token(module.params['offline_token'])
+        if module.params['offline_token']:
+            response = access_token._get_access_token(module.params['offline_token'])
+        elif module.params['client_id'] and module.params['client_secret']:
+            response = access_token._get_access_token(client_id=module.params['client_id'], client_secret=module.params['client_secret'])
+        else:
+            module.fail_json(msg="You must provide either offline_token or both client_id and client_secret.", **result)
         if response.status_code != 200:
             module.fail_json(msg='Error getting access token ', **response.json())
 

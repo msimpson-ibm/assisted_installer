@@ -44,7 +44,15 @@ options:
         type: str
     offline_token:
         description: Offline token from console.redhat.com
-        required: true
+        required: false
+        type: str
+    client_id:
+        description: RH Service Account Client ID
+        required: false
+        type: str
+    client_sercret:
+        description: RH Service Account Client Secret
+        required: false
         type: str
 
 author:
@@ -80,7 +88,9 @@ def run_module():
         ams_subscription_ids=dict(type='list', required=False),
         with_hosts=dict(type='bool', required=False),
         owner=dict(type='str', required=False),
-        offline_token=dict(type='str', required=True)
+        offline_token=dict(type='str', required=False),
+        client_id=dict(type='str', required=False),
+        client_secret=dict(type='str', required=False),
     )
 
     session = requests.Session()
@@ -103,9 +113,16 @@ def run_module():
     module = AnsibleModule(
         argument_spec=module_args,
         supports_check_mode=True,
+        required_together=[['client_id', 'client_secret']]
     )
 
-    response = access_token._get_access_token(module.params['offline_token'])
+    if module.params['offline_token']:
+        response = access_token._get_access_token(module.params['offline_token'])
+    elif module.params['client_id'] and module.params['client_secret']:
+        response = access_token._get_access_token(client_id=module.params['client_id'], client_secret=module.params['client_secret'])
+    else:
+        module.fail_json(msg="You must provide either offline_token or both client_id and client_secret.", **result)
+
     if response.status_code != 200:
         module.fail_json(msg='Error getting access token ', **response.json())
 
@@ -121,6 +138,8 @@ def run_module():
     }
     params = module.params.copy()
     params.pop("offline_token")
+    params.pop("client_id")
+    params.pop("client_secret")
     response = session.get(
         "https://api.openshift.com/api/assisted-install/v2/clusters",
         headers=headers,
